@@ -4,39 +4,28 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#2f5d50">
-  <title>Наше меню</title>
+  <title>Ассистент</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=2">
+  <link rel="stylesheet" href="style.css?v=a1">
 </head>
 <body>
   <div class="app">
     <header class="hero">
       <div class="hero-top">
         <div>
-          <div class="hero-kicker">Меню на 30 дней</div>
-          <h1 id="hero-title">Наше меню</h1>
+          <div class="hero-kicker" id="hero-kicker">Семейный ассистент</div>
+          <h1 id="hero-title">Ассистент</h1>
         </div>
-        <div class="hero-badge" id="hero-badge">🍽</div>
+        <div class="hero-badge">🏠</div>
       </div>
-      <div class="progress"><div class="progress-bar" id="hero-progress"></div></div>
       <div class="hero-sub" id="hero-sub"></div>
     </header>
 
-    <nav class="tabs">
-      <button data-tab="today" class="active"><span>🍽</span>Сегодня</button>
-      <button data-tab="dishes"><span>📖</span>Блюда</button>
-      <button data-tab="shopping"><span>🛒</span>Покупки</button>
-      <button data-tab="settings"><span>⚙️</span>Ещё</button>
-    </nav>
+    <nav class="sections" id="sections"></nav>
 
-    <main>
-      <section id="tab-today" class="tab active"></section>
-      <section id="tab-dishes" class="tab"></section>
-      <section id="tab-shopping" class="tab"></section>
-      <section id="tab-settings" class="tab"></section>
-    </main>
+    <main id="main"></main>
   </div>
 
   <div id="modal" class="modal hidden">
@@ -50,6 +39,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=2"></script>
+  <script type="module" src="app.js?v=a1"></script>
 </body>
 </html>

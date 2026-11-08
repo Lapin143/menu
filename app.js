@@ -1,84 +1,24 @@
-// Наше меню: статическое приложение без сборки.
-// Блюда и план лежат в data.json. Правки в браузере сохраняются в localStorage,
-// а кнопка «Экспорт» в настройках выгружает data.json для репозитория.
+import { iso, todayIso, addDays, daysBetween, upcoming, monthSummary, fuelStats, debtMonths, goalPct } from './core.js';
 
-const KEY = {
-  start: 'menu.start',
-  dishes: 'menu.dishes',
-  plan: 'menu.plan',
-  overrides: 'menu.overrides',
-  checked: 'menu.checked',
-  receipts: 'menu.receipts'
-};
-
-const MEAL = {
-  breakfast: { title: 'Завтрак', icon: '☀️' },
-  lunch: { title: 'Обед', icon: '🍲' },
-  dinner: { title: 'Ужин', icon: '🌙' }
-};
-const TYPE = {
-  breakfast: { title: 'Завтраки', chip: 'Завтрак' },
-  lunch: { title: 'Обеды', chip: 'Обед' },
-  soup: { title: 'Супы', chip: 'Суп' },
-  dinner: { title: 'Ужины', chip: 'Ужин' }
-};
-const DEFAULT_EMOJI = { breakfast: '🍳', lunch: '🍽', soup: '🥣', dinner: '🍛' };
-
-// Описания и эмодзи для блюд из data.json (по названию).
-const META = {
-  'Овсянка с бананом и орехами': { e: '🥣', d: 'Тёплая овсянка на молоке, мягкий банан и хрустящие орехи. Надолго сытно и отличное начало дня.' },
-  'Гречка на молоке с яблоком': { e: '🥛', d: 'Нежная гречневая каша на молоке с тёртым яблоком. По-домашнему сытно и с натуральной сладостью.' },
-  'Сырники с ягодами': { e: '🥞', d: 'Золотистые сырники из творога на минимуме муки, со свежими ягодами сверху. Нежные внутри, румяные снаружи.' },
-  'Яичница с овощами и хлебом': { e: '🍳', d: 'Яичница на мягко обжаренных помидорах и перце, с тающим сыром и ломтиком хлеба. Быстро и плотно.' },
-  'Йогурт с мюсли и фруктами': { e: '🍨', d: 'Холодный натуральный йогурт с хрустящими мюсли и фруктами. Готов за минуту, когда времени совсем нет.' },
-  'Творожная запеканка с фруктами': { e: '🍰', d: 'Воздушная запеканка из творога с фруктами, запечённая до золотистой корочки. Вкусна и тёплой, и холодной.' },
-  'Омлет с творогом': { e: '🥚', d: 'Пышный омлет с творогом внутри: мягкий, лёгкий и быстрый. Зелень делает его особенно свежим.' },
-  'Шакшука': { e: '🍅', d: 'Яйца, томлённые в ароматном томатном соусе с луком и перцем. Ярко, сытно и подаётся прямо со сковороды.' },
-  'Яйца пашот на тосте с сыром': { e: '🥚', d: 'Яйца пашот с нежным жидким желтком на поджаренном хлебе с сыром. Выглядит ресторанно и готовится быстро.' },
-  'Гранола с йогуртом и ягодами': { e: '🌾', d: 'Домашняя гранола из овсянки, орехов и мёда с йогуртом и ягодами. Хрустящая, ароматная и без лишнего сахара.' },
-
-  'Курица с рисом': { e: '🍗', d: 'Сочная курица с луком и морковью и рассыпчатый рис. Классический домашний обед, который нравится всем.' },
-  'Курица с гречкой': { e: '🍗', d: 'Курица с золотистым луком и гречка с хрустом. Простой и сытный обед, который держит энергию.' },
-  'Курица с картофелем': { e: '🍗', d: 'Курица, запечённая с картофелем и луком до румяной корочки. Всё в одной форме, почти без возни.' },
-  'Гуляш с картофелем': { e: '🥘', d: 'Нежная говядина, тушёная с луком, морковью и томатом, с картофелем. Густой и ароматный.' },
-  'Говядина тушёная с гречкой': { e: '🥩', d: 'Говядина, долго томлённая до мягкости, с рассыпчатой гречкой. Тёплый и сытный обед на каждый день.' },
-  'Говядина тушёная с рисом': { e: '🥩', d: 'Тушёная говядина в мягком соусе с овощами и рисом. Гарнир вбирает вкус мяса, очень уютно.' },
-  'Бефстроганов с макаронами': { e: '🍝', d: 'Говядина полосками в луковом соусе с соевым акцентом и макаронами. Быстрый и насыщенный обед.' },
-  'Форель с рисом': { e: '🐟', d: 'Запечённая форель с лимоном и рассыпчатым рисом. Лёгкий, но сытный обед с тонким вкусом рыбы.' },
-  'Белая рыба с гречкой': { e: '🐟', d: 'Нежное филе белой рыбы со специями и лимоном, с гречкой. Лёгкий обед, который не утяжеляет.' },
-  'Белая рыба с картофелем': { e: '🐟', d: 'Белая рыба, запечённая с картофелем и лимоном. Нежно, ароматно и без лишних хлопот.' },
-  'Рагу из свинины с овощами': { e: '🍖', d: 'Сочная свинина, томлённая с картофелем и овощами. Густое рагу, которое тает во рту.' },
-
-  'Куриный суп с лапшой': { e: '🍜', d: 'Прозрачный бульон из курицы с овощами и домашней лапшой. Классика, которая готовится сразу на два дня.' },
-  'Щи из говядины': { e: '🥣', d: 'Наваристые щи из говядины с капустой и томатом. Кислинка и густой бульон, отличный выбор на выходные.' },
-  'Гороховый суп с хлебом': { e: '🫕', d: 'Густой горох с картофелем и овощами, подаётся с ломтиком хлеба. Сытный, тёплый и любимый многими.' },
-  'Борщ с говядиной': { e: '🍲', d: 'Яркий борщ со свёклой, капустой и говядиной в насыщенном бульоне. Со сметаной и хлебом — идеально.' },
-
-  'Омлет с овощами и сыром': { e: '🍳', d: 'Пышный омлет с помидорами, перцем и сыром. Лёгкий ужин, который готовится за несколько минут.' },
-  'Макароны с томатным соусом и сыром': { e: '🍝', d: 'Макароны в ароматном томатном соусе с луком и тающим сыром. Простой и уютный ужин.' },
-  'Рис с яйцом и овощами': { e: '🍚', d: 'Жареный рис с овощами, соевым соусом и яйцом. Быстрое блюдо из вчерашнего риса, очень вкусное.' },
-  'Форель с картофелем': { e: '🐟', d: 'Запечённая форель с картофелем и лимоном. Нежная рыба и румяный картофель на одном противне.' },
-  'Белая рыба с овощами': { e: '🐟', d: 'Белая рыба, запечённая с овощной смесью и луком. Лёгкий ужин, полезный и красивый на тарелке.' },
-  'Курица карри с рисом': { e: '🍛', d: 'Курица в мягком карри с кокосовым молоком и томатами, с рисом. Тёплые специи и нежный соус.' },
-  'Курица запечённая с картофелем': { e: '🍗', d: 'Курица и картофель, запечённые со специями до хрустящей корочки. Ужин без стояния у плиты.' },
-  'Говядина тушёная с картофелем': { e: '🥘', d: 'Говядина, тушёная с луком, морковью и томатной пастой, с картофелем. Густо, ароматно и по-домашнему.' },
-  'Шакшука (ужин)': { e: '🍅', d: 'Яйца в томатном соусе с луком и перцем. Лёгкий вечерний вариант с ярким вкусом.' }
-};
-
-let D = {};        // startDate, dishes, plan, bulk, weekly
-let viewDay = 1;
-let dishFilter = 'all';
-let dishQuery = '';
-
+// ---------- помощники ----------
 const $ = (sel) => document.querySelector(sel);
-const read = (k, def) => {
-  try { const v = localStorage.getItem(k); return v === null ? def : JSON.parse(v); }
-  catch { return def; }
-};
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const uid = () => Math.random().toString(36).slice(2, 8) + Date.now().toString(36).slice(-4);
+const read = (k, d) => { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch { return d; } };
 const write = (k, v) => localStorage.setItem(k, JSON.stringify(v));
-const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => (
-  { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
-));
+const save = () => write('as.data', S);
+const money = (n) => `${Math.round(Number(n) || 0).toLocaleString('ru-RU')} ${S.settings.currency}`;
+const fmtDate = (s) => { if (!s) return ''; const [y, m, d] = s.split('-'); return `${d}.${m}.${y}`; };
+const monthName = (ym) => { const [y, m] = ym.split('-'); return new Date(Number(y), Number(m) - 1, 1).toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' }); };
+const shiftMonth = (ym, k) => { const d = new Date(ym + '-01T00:00'); d.setMonth(d.getMonth() + k); return iso(d).slice(0, 7); };
+const personName = (id) => (S.people.find((p) => p.id === id) || {}).name || '';
+const personOpts = () => [['', 'Общее'], ...S.people.map((p) => [p.id, p.name])];
+const catAll = () => [...new Set([...S.categories.expense, ...S.categories.income])].map((c) => [c, c]);
+const accOpts = () => S.accounts.map((a) => [a.id, a.name]);
+const carOpts = () => S.cars.map((c) => [c.id, `${c.make} ${c.model}`]);
+const meterOpts = () => S.meters.map((m) => [m.id, m.name]);
+const need = (o, keys) => keys.every((k) => o[k] !== '' && o[k] !== undefined && !(typeof o[k] === 'number' && isNaN(o[k])));
+const safeUrl = (u) => (/^https?:\/\//.test(u || '') ? esc(u) : '');
 
 function toast(msg) {
   const t = document.createElement('div');
@@ -88,466 +28,628 @@ function toast(msg) {
   setTimeout(() => t.remove(), 1800);
 }
 
-// ---------- даты и план ----------
-function parseDate(iso) { const [y, m, d] = iso.split('-').map(Number); return new Date(y, m - 1, d); }
-function dateOfDay(n) { const s = parseDate(D.startDate); s.setDate(s.getDate() + n - 1); return s; }
-function fmtDate(dt) { return dt.toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' }); }
-function todayDay() {
-  const s = parseDate(D.startDate);
-  const t = new Date(); t.setHours(0, 0, 0, 0);
-  return Math.floor((t - s) / 86400000) + 1;
-}
-function isWeekend(n) { const w = dateOfDay(n).getDay(); return w === 0 || w === 6; }
-function planDay(n) { return D.plan.find((p) => p.day === n); }
-function dishByName(name) { return D.dishes.find((x) => x.name === name); }
-function dishInfo(name) {
-  const d = dishByName(name) || {};
-  const m = META[name] || {};
-  const type = d.type || 'lunch';
-  return {
-    name,
-    type,
-    emoji: d.emoji || m.e || DEFAULT_EMOJI[type] || '🍽',
-    description: d.description || m.d || '',
-    composition: d.composition || '',
-    steps: d.steps || ''
-  };
-}
-function currentMeal(n, slot) {
-  const ov = read(KEY.overrides, {});
-  return (ov[n] && ov[n][slot]) || (planDay(n) && planDay(n)[slot]) || '';
-}
-function poolFor(n, slot) {
-  const type = slot === 'lunch' ? (isWeekend(n) ? 'soup' : 'lunch') : slot;
-  return D.dishes.filter((d) => d.type === type).map((d) => d.name);
-}
-function setMeal(n, slot, name) {
-  const ov = read(KEY.overrides, {});
-  const apply = (day, value) => {
-    ov[day] = ov[day] || {};
-    if (planDay(day) && planDay(day)[slot] === value) delete ov[day][slot];
-    else ov[day][slot] = value;
-    if (!Object.keys(ov[day]).length) delete ov[day];
-  };
-  apply(n, name);
-  // суп варится на два дня: суббота → воскресенье
-  if (slot === 'lunch' && dateOfDay(n).getDay() === 6 && planDay(n + 1)) apply(n + 1, name);
-  write(KEY.overrides, ov);
-}
-function revertMeal(n, slot) {
-  const ov = read(KEY.overrides, {});
-  const clear = (day) => {
-    if (ov[day]) { delete ov[day][slot]; if (!Object.keys(ov[day]).length) delete ov[day]; }
-  };
-  clear(n);
-  if (slot === 'lunch' && dateOfDay(n).getDay() === 6) clear(n + 1);
-  write(KEY.overrides, ov);
+// ---------- состояние ----------
+let S = null;
+let ME = null;
+let SEC = 'dash';
+let FIN_MONTH = todayIso().slice(0, 7);
+let FIN_TAB = 'ops';
+let GOAL_KIND = 'long';
+let HOUSE_TAB = 'tasks';
+let CAR_ID = null;
+
+const SECTIONS = [
+  ['dash', 'Главная'], ['fin', 'Финансы'], ['goals', 'Цели'], ['wish', 'Вишлист'], ['rem', 'Напоминания'],
+  ['car', 'Авто'], ['house', 'Дом'], ['docs', 'Документы'], ['people', 'Люди']
+];
+
+// ---------- формы ----------
+function fieldHtml(f) {
+  const id = 'f_' + f.k;
+  const val = f.v ?? '';
+  if (f.t === 'check') return `<label class="chk"><input type="checkbox" id="${id}" ${f.v ? 'checked' : ''}> ${esc(f.l)}</label>`;
+  if (f.t === 'select') {
+    return `<label class="field">${esc(f.l)}</label><select id="${id}">${f.opts.map(([v, l]) =>
+      `<option value="${esc(v)}" ${String(v) === String(val) ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>`;
+  }
+  if (f.t === 'area') return `<label class="field">${esc(f.l)}</label><textarea id="${id}" rows="2">${esc(val)}</textarea>`;
+  const inputmode = f.t === 'number' ? 'decimal' : '';
+  return `<label class="field">${esc(f.l)}</label><input id="${id}" type="${f.t || 'text'}" inputmode="${inputmode}" value="${esc(val)}" placeholder="${esc(f.ph || '')}">`;
 }
 
-// ---------- модальное окно ----------
-function showModal(title, html) {
+function openForm(title, fields, onSave) {
   $('#modal-title').textContent = title;
-  $('#modal-body').innerHTML = html;
+  $('#modal-body').innerHTML = `<div class="form">${fields.map(fieldHtml).join('')}
+    <button class="btn block" id="f-save" style="margin-top:6px">Сохранить</button></div>`;
   $('#modal').classList.remove('hidden');
+  $('#f-save').onclick = () => {
+    const out = {};
+    for (const f of fields) {
+      const el = $('#f_' + f.k);
+      if (f.t === 'check') out[f.k] = el.checked;
+      else if (f.t === 'number') out[f.k] = el.value === '' ? '' : parseFloat(String(el.value).replace(',', '.'));
+      else out[f.k] = el.value.trim();
+    }
+    const err = onSave(out);
+    if (err) return toast(err);
+    save();
+    closeModal();
+    render();
+  };
 }
-function hideModal() { $('#modal').classList.add('hidden'); }
+function closeModal() { $('#modal').classList.add('hidden'); }
 
-// ---------- шапка ----------
-function renderHero() {
-  const t = todayDay();
-  const max = D.plan.length;
-  const shown = Math.min(Math.max(t, 1), max);
-  $('#hero-title').textContent = t < 1 ? 'Меню скоро начнётся' : t > max ? 'Меню на 30 дней завершено' : 'Наше меню';
-  $('#hero-sub').textContent = t >= 1 && t <= max
-    ? `День ${t} из ${max} · ${fmtDate(dateOfDay(t))}`
-    : `Первый день плана: ${fmtDate(parseDate(D.startDate))}`;
-  $('#hero-progress').style.width = `${Math.round((shown / max) * 100)}%`;
-  $('#hero-badge').textContent = t >= 1 && t <= max && isWeekend(t) ? '🥣' : '🍽';
+// ---------- общие куски разметки ----------
+const liUp = (x) => `<div class="li ${x.overdue ? 'overdue' : ''}">
+  <span class="dot ${x.kind}"></span>
+  <div class="main"><div class="t">${esc(x.title)}</div>
+  <div class="s">${fmtDate(x.date)}${x.personId ? ' · ' + esc(personName(x.personId)) : ''}${x.overdue ? ' · просрочено' : ''}</div></div>
+  ${x.amount ? `<div class="amt">${money(x.amount)}</div>` : ''}</div>`;
+
+const goalRow = (g) => `<div class="li" style="display:block">
+  <div class="row" style="justify-content:space-between"><span class="t">${esc(g.title)}</span><span class="note">${goalPct(g)}%</span></div>
+  <div class="bar"><div style="width:${goalPct(g)}%"></div></div></div>`;
+
+const opRow = (t) => `<div class="li">
+  <div class="main"><div class="t">${esc(t.category)}${t.private ? '<span class="badge-private">личное</span>' : ''}</div>
+  <div class="s">${fmtDate(t.date)}${t.note ? ' · ' + esc(t.note) : ''}${t.personId ? ' · ' + esc(personName(t.personId)) : ''}</div></div>
+  <div class="amt ${t.type === 'income' ? 'inc' : 'exp'}">${t.type === 'income' ? '+' : '−'}${money(t.amount)}</div>
+  <button class="icon-btn" data-act="del" data-coll="transactions" data-id="${t.id}" aria-label="Удалить">✕</button></div>`;
+
+const CAR_TYPES = { fuel: 'Топливо', service: 'ТО', repair: 'Ремонт', wash: 'Мойка', parking: 'Парковка', fine: 'Штраф', other: 'Прочее' };
+const REPEAT = { none: 'однократно', month: 'каждый месяц', year: 'каждый год' };
+
+// ---------- разделы ----------
+function viewDash() {
+  const t = todayIso();
+  const ym = t.slice(0, 7);
+  const s = monthSummary(S, ym, ME);
+  const up = upcoming(S, t, 14);
+  return `
+    <div class="grid-2" style="margin-bottom:12px">
+      <div class="stat"><div class="lbl">Доходы, ${monthName(ym)}</div><div class="val pos">${money(s.income)}</div></div>
+      <div class="stat"><div class="lbl">Расходы</div><div class="val neg">${money(s.expense)}</div></div>
+    </div>
+    <div class="card"><div class="setting-title">Ближайшие 14 дней</div>
+      ${up.length ? up.map(liUp).join('') : '<div class="empty">Ничего не запланировано</div>'}</div>
+    <div class="card"><div class="setting-title">Цели</div>
+      ${S.goals.length ? S.goals.slice(0, 3).map(goalRow).join('') : '<div class="empty">Целей пока нет</div>'}</div>
+    <div class="card"><button class="btn soft block" data-act="notify">Включить уведомления</button>
+      <p class="note">На телефоне уведомления приходят, пока приложение открыто. Отправку в Telegram смотрите в README.</p></div>`;
 }
 
-// ---------- вкладка «Сегодня» ----------
-function renderToday() {
-  const el = $('#tab-today');
-  const t = todayDay();
-  const max = D.plan.length;
-  const n = viewDay;
-  const isToday = n === t;
-  const weekend = isWeekend(n);
+function viewFin() {
+  const s = monthSummary(S, FIN_MONTH, ME);
+  const top = `<div class="row" style="justify-content:space-between;margin-bottom:10px">
+    <button class="icon-btn" data-act="finMonth" data-d="-1" aria-label="Предыдущий месяц">←</button>
+    <strong style="text-transform:capitalize">${monthName(FIN_MONTH)}</strong>
+    <button class="icon-btn" data-act="finMonth" data-d="1" aria-label="Следующий месяц">→</button></div>`;
+  const stats = `<div class="grid-2" style="margin-bottom:12px">
+    <div class="stat"><div class="lbl">Доходы</div><div class="val pos">${money(s.income)}</div></div>
+    <div class="stat"><div class="lbl">Расходы</div><div class="val neg">${money(s.expense)}</div></div></div>`;
+  const tabs = `<div class="tabline">${[['ops', 'Операции'], ['rec', 'Регулярные'], ['debt', 'Долги']]
+    .map(([v, l]) => `<button class="${FIN_TAB === v ? 'active' : ''}" data-act="finTab" data-v="${v}">${l}</button>`).join('')}</div>`;
 
-  let html = `
-    <div class="day-nav">
-      <button class="icon-btn" id="prev" ${n <= 1 ? 'disabled' : ''} aria-label="Предыдущий день">←</button>
-      <div class="label">
-        <strong>День ${n} из ${max}${isToday ? '<span class="today-pill">сегодня</span>' : ''}</strong>
-        <span class="muted">${esc(fmtDate(dateOfDay(n)))}</span>
-      </div>
-      <button class="icon-btn" id="next" ${n >= max ? 'disabled' : ''} aria-label="Следующий день">→</button>
-    </div>`;
-
-  if (weekend) {
-    html += `<div class="soup-note">🥣 На обед суп: одна кастрюля на субботу и воскресенье</div>`;
+  let body = '';
+  if (FIN_TAB === 'ops') {
+    const cats = Object.entries(s.byCategory).sort((a, b) => b[1] - a[1]);
+    const ops = S.transactions
+      .filter((t) => t.date.startsWith(FIN_MONTH) && (!t.private || t.personId === ME))
+      .sort((a, b) => (a.date < b.date ? 1 : -1));
+    body += `<div class="card"><div class="setting-title">По категориям</div>
+      ${cats.length ? cats.map(([c, v]) => `<div style="margin:8px 0">
+        <div class="row" style="justify-content:space-between"><span>${esc(c)}</span><b>${money(v)}</b></div>
+        <div class="bar"><div style="width:${s.expense ? Math.round((v / s.expense) * 100) : 0}%"></div></div></div>`).join('')
+        : '<div class="empty">Расходов нет</div>'}</div>
+      <div class="card"><div class="row" style="justify-content:space-between">
+        <div class="setting-title">Операции</div><button class="btn" data-act="addOp">+ Операция</button></div>
+        ${ops.length ? ops.map(opRow).join('') : '<div class="empty">Операций за месяц нет</div>'}</div>`;
+  } else if (FIN_TAB === 'rec') {
+    const monthly = S.recurring.filter((r) => r.active).reduce((a, r) => a + Number(r.amount), 0);
+    body += `<div class="card"><div class="row" style="justify-content:space-between">
+      <div class="setting-title">Регулярные платежи</div><button class="btn" data-act="addRec">+ Платёж</button></div>
+      ${S.recurring.length ? S.recurring.map((r) => `<div class="li">
+        <div class="main"><div class="t">${esc(r.title)}${r.personId ? `<span class="badge-private">${esc(personName(r.personId))}</span>` : ''}</div>
+        <div class="s">${r.day}-го числа · ${esc(r.category || '')}${r.active ? '' : ' · на паузе'}</div></div>
+        <div class="amt">${money(r.amount)}</div>
+        <button class="icon-btn" data-act="toggleRec" data-id="${r.id}" aria-label="Пауза">${r.active ? '⏸' : '▶'}</button>
+        <button class="icon-btn" data-act="del" data-coll="recurring" data-id="${r.id}" aria-label="Удалить">✕</button></div>`).join('')
+        : '<div class="empty">Регулярных платежей нет</div>'}
+      <p class="note">Итого в месяц: ${money(monthly)}</p></div>`;
+  } else {
+    body += `<div class="card"><div class="row" style="justify-content:space-between">
+      <div class="setting-title">Долги и кредиты</div><button class="btn" data-act="addDebt">+ Долг</button></div>
+      ${S.debts.length ? S.debts.map((d) => {
+        const m = debtMonths(d.remaining, d.monthly);
+        const paid = d.total ? Math.round((1 - d.remaining / d.total) * 100) : 0;
+        return `<div class="li" style="display:block">
+          <div class="row" style="justify-content:space-between"><div class="t">${esc(d.title)}</div><b>${money(d.remaining)}</b></div>
+          <div class="s">Платёж ${money(d.monthly)} · ${d.dueDay}-го числа${m ? ` · осталось около ${m} мес.` : ''}</div>
+          <div class="bar"><div style="width:${paid}%"></div></div>
+          <div class="row" style="margin-top:8px">
+            <button class="btn soft" data-act="payDebt" data-id="${d.id}">Внести платёж</button>
+            <button class="icon-btn" data-act="del" data-coll="debts" data-id="${d.id}" aria-label="Удалить">✕</button></div></div>`;
+      }).join('') : '<div class="empty">Долгов нет</div>'}</div>`;
   }
+  return top + stats + tabs + body;
+}
 
-  for (const slot of ['breakfast', 'lunch', 'dinner']) {
-    const name = currentMeal(n, slot);
-    const planName = planDay(n) ? planDay(n)[slot] : '';
-    const info = dishInfo(name);
-    const replaced = name !== planName;
-    const label = MEAL[slot].title + (slot === 'lunch' && weekend ? ' · суп' : '');
-    html += `
-      <article class="meal ${slot}">
-        <div class="meal-head">
-          <div class="meal-emoji">${esc(info.emoji)}</div>
-          <div class="meal-body">
-            <span class="chip ${slot}">${MEAL[slot].icon} ${label}</span>
-            <div class="meal-name">${esc(name)}</div>
-          </div>
-        </div>
-        ${info.description ? `<p class="meal-desc">${esc(info.description)}</p>` : ''}
-        <div class="meal-actions">
-          <button class="btn soft" data-replace="${slot}">Заменить</button>
-        </div>
-        ${replaced ? `<div class="replaced-note">Заменено. По плану: ${esc(planName)} · <a href="#" data-revert="${slot}">вернуть</a></div>` : ''}
-        ${info.composition || info.steps ? `
-        <details class="recipe">
-          <summary>Рецепт</summary>
-          ${info.composition ? `<p><b>Состав:</b> ${esc(info.composition)}</p>` : ''}
-          ${info.steps ? `<p><b>Как готовить:</b> ${esc(info.steps)}</p>` : ''}
-        </details>` : ''}
-      </article>`;
+function goalCard(g) {
+  const pct = goalPct(g);
+  const left = Math.max(0, (g.target || 0) - (g.saved || 0));
+  let perMonth = null;
+  if (g.deadline) {
+    const months = Math.max(1, Math.ceil(daysBetween(todayIso(), g.deadline) / 30));
+    perMonth = left / months;
   }
-  el.innerHTML = html;
-
-  $('#prev').onclick = () => { viewDay--; renderToday(); };
-  $('#next').onclick = () => { viewDay++; renderToday(); };
-  el.querySelectorAll('[data-replace]').forEach((b) => {
-    b.onclick = () => openReplace(n, b.dataset.replace);
-  });
-  el.querySelectorAll('[data-revert]').forEach((a) => {
-    a.onclick = (e) => { e.preventDefault(); revertMeal(n, a.dataset.revert); renderToday(); toast('План восстановлен'); };
-  });
+  return `<div class="card">
+    <div class="row" style="justify-content:space-between">
+      <div><div class="setting-title" style="margin:0">${esc(g.title)}</div>
+      <div class="note">${personName(g.personId) || 'Общая'}${g.deadline ? ' · до ' + fmtDate(g.deadline) : ''}</div></div>
+      <button class="icon-btn" data-act="del" data-coll="goals" data-id="${g.id}" aria-label="Удалить">✕</button></div>
+    <div class="row" style="justify-content:space-between;margin-top:10px"><b>${money(g.saved)}</b>
+      <span class="note">из ${money(g.target)} · ${pct}%</span></div>
+    <div class="bar"><div style="width:${pct}%"></div></div>
+    ${perMonth !== null && left > 0 ? `<div class="note" style="margin-top:6px">Откладывать около ${money(perMonth)} в месяц</div>` : ''}
+    <div class="row" style="margin-top:10px"><button class="btn soft" data-act="topUp" data-id="${g.id}">Пополнить</button></div>
+  </div>`;
 }
 
-function openReplace(n, slot) {
-  const pool = poolFor(n, slot);
-  const cur = currentMeal(n, slot);
-  const body = pool.length
-    ? `<p class="muted" style="margin:0 0 10px">Выберите, что готовим. Блюда того же типа.</p>
-       <div class="tiles">${pool.map((name) => {
-         const i = dishInfo(name);
-         return `<button class="tile ${name === cur ? 'current' : ''}" data-pick="${esc(name)}">
-           <span class="e">${esc(i.emoji)}</span>
-           <span class="n">${esc(name)}</span>
-           ${name === cur ? '<span class="now">сейчас</span>' : ''}
-         </button>`;
-       }).join('')}</div>`
-    : '<p class="muted">Нет блюд этого типа. Добавьте их на вкладке «Блюда».</p>';
-  showModal(`${MEAL[slot].title}, день ${n}`, body);
-  $('#modal-body').querySelectorAll('[data-pick]').forEach((b) => {
-    b.onclick = () => { setMeal(n, slot, b.dataset.pick); hideModal(); renderToday(); toast('Блюдо заменено'); };
-  });
+function viewGoals() {
+  const list = S.goals.filter((g) => g.kind === GOAL_KIND);
+  return `<div class="tabline">
+      <button class="${GOAL_KIND === 'long' ? 'active' : ''}" data-act="goalKind" data-v="long">Долгосрочные</button>
+      <button class="${GOAL_KIND === 'short' ? 'active' : ''}" data-act="goalKind" data-v="short">Краткосрочные</button></div>
+    <div class="row" style="justify-content:flex-end;margin-bottom:8px"><button class="btn" data-act="addGoal">+ Цель</button></div>
+    ${list.length ? list.map(goalCard).join('') : '<div class="card empty">Целей этого типа пока нет</div>'}`;
 }
 
-// ---------- вкладка «Блюда» ----------
-function renderDishes() {
-  const el = $('#tab-dishes');
-  const types = ['all', 'breakfast', 'lunch', 'soup', 'dinner'];
-  const names = { all: 'Все', breakfast: 'Завтраки', lunch: 'Обеды', soup: 'Супы', dinner: 'Ужины' };
-  const q = dishQuery.trim().toLowerCase();
+function viewWish() {
+  const items = [...S.wishes].sort((a, b) => (a.bought - b.bought) || (a.priority - b.priority));
+  const prio = ['', 'Высокий', 'Средний', 'Низкий'];
+  return `<div class="row" style="justify-content:flex-end;margin-bottom:8px"><button class="btn" data-act="addWish">+ Желание</button></div>
+    <div class="card">${items.length ? items.map((w) => `<div class="li">
+      <button class="icon-btn" data-act="wishBought" data-id="${w.id}" aria-label="Отметить купленным">${w.bought ? '✅' : '⬜'}</button>
+      <div class="main"><div class="t" style="${w.bought ? 'text-decoration:line-through;color:var(--done)' : ''}">${esc(w.title)}</div>
+        <div class="s">${w.price ? money(w.price) + ' · ' : ''}${prio[w.priority] || ''}${personName(w.personId) ? ' · для ' + esc(personName(w.personId)) : ''}${safeUrl(w.url) ? ` · <a href="${safeUrl(w.url)}" target="_blank" rel="noopener">ссылка</a>` : ''}</div></div>
+      <button class="icon-btn" data-act="del" data-coll="wishes" data-id="${w.id}" aria-label="Удалить">✕</button></div>`).join('')
+      : '<div class="empty">Вишлист пуст</div>'}</div>`;
+}
 
-  const list = D.dishes
-    .map((d, i) => ({ d, i, info: dishInfo(d.name) }))
-    .filter(({ d, info }) => (dishFilter === 'all' || d.type === dishFilter)
-      && (!q || d.name.toLowerCase().includes(q) || info.description.toLowerCase().includes(q)));
+function viewRem() {
+  const up = upcoming(S, todayIso(), 60);
+  return `<div class="row" style="justify-content:flex-end;margin-bottom:8px"><button class="btn" data-act="addRem">+ Напоминание</button></div>
+    <div class="card"><div class="setting-title">Ближайшие 60 дней</div>
+      ${up.length ? up.map(liUp).join('') : '<div class="empty">Событий нет</div>'}</div>
+    <div class="card"><div class="setting-title">Свои напоминания</div>
+      ${S.reminders.length ? S.reminders.map((r) => `<div class="li">
+        <div class="main"><div class="t">${esc(r.title)}</div>
+        <div class="s">${fmtDate(r.date)} · ${REPEAT[r.repeat] || ''}${r.personId ? ' · ' + esc(personName(r.personId)) : ''}</div></div>
+        <button class="icon-btn" data-act="del" data-coll="reminders" data-id="${r.id}" aria-label="Удалить">✕</button></div>`).join('')
+        : '<div class="empty">Своих напоминаний нет</div>'}</div>`;
+}
 
-  let html = `
-    <div class="search"><input id="dish-q" placeholder="Поиск блюда" value="${esc(dishQuery)}"></div>
-    <div class="filters">${types.map((t) =>
-      `<button class="${t === dishFilter ? 'active' : ''}" data-filter="${t}">${names[t]}</button>`).join('')}</div>
-    <p class="muted" style="margin:4px 4px 10px">Показано: ${list.length} из ${D.dishes.length}</p>
-    <div class="dish-grid">`;
+function carCard(c) {
+  const open = CAR_ID === c.id;
+  const exps = S.carExpenses.filter((e) => e.carId === c.id).sort((a, b) => (a.date < b.date ? 1 : -1));
+  const ym = todayIso().slice(0, 7);
+  const month = exps.filter((e) => e.date.startsWith(ym)).reduce((a, e) => a + Number(e.amount), 0);
+  const total = exps.reduce((a, e) => a + Number(e.amount), 0);
+  const fs = fuelStats(S.carExpenses, c.id);
+  return `<div class="card">
+    <div class="row" style="justify-content:space-between">
+      <div data-act="carOpen" data-id="${c.id}" style="cursor:pointer;flex:1">
+        <div class="setting-title" style="margin:0">${esc(c.make)} ${esc(c.model)} ${c.year ? `<span class="note">${esc(c.year)}</span>` : ''}</div>
+        <div class="note">${esc(c.plate || '')}${c.mileage ? ' · пробег ' + Number(c.mileage).toLocaleString('ru-RU') + ' км' : ''}</div></div>
+      <button class="icon-btn" data-act="del" data-coll="cars" data-id="${c.id}" aria-label="Удалить">✕</button></div>
+    <div class="grid-2" style="margin-top:10px">
+      <div class="stat"><div class="lbl">За месяц</div><div class="val">${money(month)}</div></div>
+      <div class="stat"><div class="lbl">Расход топлива</div><div class="val">${fs.avg ? fs.avg.toFixed(1) + ' л/100 км' : '—'}</div></div></div>
+    ${c.insuranceUntil ? `<div class="note" style="margin-top:8px">Страховка до ${fmtDate(c.insuranceUntil)}</div>` : ''}
+    ${c.inspectionUntil ? `<div class="note">Техосмотр до ${fmtDate(c.inspectionUntil)}</div>` : ''}
+    ${open ? `<div class="sub-title">Расходы · всего ${money(total)}</div>
+      <div class="row" style="justify-content:flex-end"><button class="btn" data-act="addCarExp" data-id="${c.id}">+ Расход</button></div>
+      ${exps.length ? exps.map((e) => `<div class="li">
+        <div class="main"><div class="t">${CAR_TYPES[e.type] || e.type}${e.liters ? ` · ${e.liters} л` : ''}</div>
+        <div class="s">${fmtDate(e.date)}${e.mileage ? ' · ' + Number(e.mileage).toLocaleString('ru-RU') + ' км' : ''}${e.note ? ' · ' + esc(e.note) : ''}</div></div>
+        <div class="amt exp">−${money(e.amount)}</div>
+        <button class="icon-btn" data-act="del" data-coll="carExpenses" data-id="${e.id}" aria-label="Удалить">✕</button></div>`).join('')
+        : '<div class="empty">Расходов пока нет</div>'}` : ''}
+  </div>`;
+}
 
-  for (const { d, i, info } of list) {
-    const used = D.plan.filter((p) => p.breakfast === d.name || p.lunch === d.name || p.dinner === d.name).length;
-    html += `
-      <div class="dish">
-        <div class="e">${esc(info.emoji)}</div>
-        <div class="b">
-          <div class="nm">${esc(d.name)}</div>
-          ${info.description ? `<div class="ds">${esc(info.description)}</div>` : ''}
-          <div class="meta">
-            <span class="chip ${d.type}">${TYPE[d.type] ? TYPE[d.type].chip : d.type}</span>
-            <span class="muted">в плане: ${used}</span>
-            <button class="btn danger" data-del="${i}" style="padding:5px 10px;font-size:12px">Удалить</button>
-          </div>
-          ${info.composition || info.steps ? `
-          <details class="recipe">
-            <summary>Рецепт</summary>
-            ${info.composition ? `<p><b>Состав:</b> ${esc(info.composition)}</p>` : ''}
-            ${info.steps ? `<p><b>Как готовить:</b> ${esc(info.steps)}</p>` : ''}
-          </details>` : ''}
-        </div>
-      </div>`;
+function viewCar() {
+  return `<div class="row" style="justify-content:flex-end;margin-bottom:8px"><button class="btn" data-act="addCar">+ Автомобиль</button></div>
+    ${S.cars.length ? S.cars.map(carCard).join('') : '<div class="card empty">Добавьте автомобиль, чтобы вести расходы и сроки</div>'}`;
+}
+
+function viewHouse() {
+  const tabs = `<div class="tabline">
+    <button class="${HOUSE_TAB === 'tasks' ? 'active' : ''}" data-act="houseTab" data-v="tasks">Дела</button>
+    <button class="${HOUSE_TAB === 'meters' ? 'active' : ''}" data-act="houseTab" data-v="meters">Счётчики</button></div>`;
+  if (HOUSE_TAB === 'tasks') {
+    const t = todayIso();
+    return tabs + `<div class="row" style="justify-content:flex-end;margin-bottom:8px"><button class="btn" data-act="addTask">+ Дело</button></div>
+      <div class="card">${S.homeTasks.length ? S.homeTasks.map((x) => {
+        const due = x.lastDone ? addDays(x.lastDone, x.everyDays) : t;
+        const overdue = due < t;
+        return `<div class="li ${overdue ? 'overdue' : ''}">
+          <div class="main"><div class="t">${esc(x.title)}</div>
+          <div class="s">Каждые ${x.everyDays} дн. · ${overdue ? 'просрочено · ' : ''}${fmtDate(due)}${personName(x.assignee) ? ' · ' + esc(personName(x.assignee)) : ''}</div></div>
+          <button class="btn soft" data-act="taskDone" data-id="${x.id}">Сделано</button>
+          <button class="icon-btn" data-act="del" data-coll="homeTasks" data-id="${x.id}" aria-label="Удалить">✕</button></div>`;
+      }).join('') : '<div class="empty">Дел по дому пока нет</div>'}</div>`;
   }
-  html += `</div>
-    <div class="add-card">
-      <h3>Добавить блюдо</h3>
-      <label class="field">Название</label><input id="d-name">
-      <label class="field">Тип</label>
-      <select id="d-type">
-        <option value="breakfast">Завтрак</option>
-        <option value="lunch">Обед</option>
-        <option value="soup">Суп (суббота и воскресенье)</option>
-        <option value="dinner">Ужин</option>
-      </select>
-      <label class="field">Эмодзи (необязательно)</label><input id="d-emoji" maxlength="4">
-      <label class="field">Описание</label><textarea id="d-desc" rows="2"></textarea>
-      <label class="field">Состав (продукты и граммовки)</label><textarea id="d-comp" rows="2"></textarea>
-      <label class="field">Как готовить</label><textarea id="d-steps" rows="2"></textarea>
-      <button class="btn block" id="d-add">Добавить блюдо</button>
-    </div>`;
-  el.innerHTML = html;
-
-  el.querySelectorAll('[data-filter]').forEach((b) => {
-    b.onclick = () => { dishFilter = b.dataset.filter; renderDishes(); };
-  });
-  const qi = $('#dish-q');
-  qi.oninput = () => {
-    dishQuery = qi.value;
-    const pos = qi.selectionStart;
-    renderDishes();
-    const again = $('#dish-q');
-    again.focus();
-    again.setSelectionRange(pos, pos);
-  };
-  el.querySelectorAll('[data-del]').forEach((b) => {
-    b.onclick = () => {
-      const idx = Number(b.dataset.del);
-      const dish = D.dishes[idx];
-      if (!confirm(`Удалить «${dish.name}»? Из плана оно не исчезнет, но для замены будет недоступно.`)) return;
-      D.dishes.splice(idx, 1);
-      write(KEY.dishes, D.dishes);
-      renderDishes();
-      toast('Блюдо удалено');
-    };
-  });
-  $('#d-add').onclick = () => {
-    const name = $('#d-name').value.trim();
-    if (!name) return toast('Введите название');
-    if (dishByName(name)) return toast('Такое блюдо уже есть');
-    D.dishes.push({
-      name,
-      type: $('#d-type').value,
-      emoji: $('#d-emoji').value.trim() || undefined,
-      description: $('#d-desc').value.trim() || undefined,
-      composition: $('#d-comp').value.trim(),
-      steps: $('#d-steps').value.trim()
-    });
-    write(KEY.dishes, D.dishes);
-    renderDishes();
-    toast('Блюдо добавлено');
-  };
+  return tabs + `<div class="card">${S.meters.map((m) => {
+    const rs = S.meterReadings.filter((r) => r.meterId === m.id).sort((a, b) => (a.date < b.date ? 1 : -1));
+    const last = rs[0];
+    const prev = rs[1];
+    const used = last && prev ? last.value - prev.value : null;
+    return `<div class="li">
+      <div class="main"><div class="t">${esc(m.name)}</div>
+      <div class="s">${last ? `Последнее: ${last.value} ${esc(m.unit)} · ${fmtDate(last.date)}${used !== null ? ` · расход ${used.toFixed(1)} ${esc(m.unit)}` : ''}` : 'Показаний ещё нет'}</div></div>
+      <button class="icon-btn" data-act="addReading" data-id="${m.id}" aria-label="Внести показание">＋</button>
+      <button class="icon-btn" data-act="del" data-coll="meters" data-id="${m.id}" aria-label="Удалить">✕</button></div>`;
+  }).join('') || '<div class="empty">Счётчиков нет</div>'}
+  <div class="row" style="justify-content:flex-end;margin-top:10px"><button class="btn soft" data-act="addMeter">+ Счётчик</button></div></div>`;
 }
 
-// ---------- вкладка «Покупки» ----------
-function renderShopping() {
-  const el = $('#tab-shopping');
-  const checked = read(KEY.checked, {});
-  const all = [...D.bulk, ...D.weekly];
-  const keyOf = (idx) => (idx < D.bulk.length ? 'b' + idx : 'w' + (idx - D.bulk.length));
-  const doneCount = all.reduce((a, _, idx) => a + (checked[keyOf(idx)] ? 1 : 0), 0);
-  const checkedNames = all.filter((_, idx) => checked[keyOf(idx)]).map((it) => it.name);
-
-  const section = (title, sub, list, prefix) => {
-    let s = `<div class="shop-card"><h3>${esc(title)}</h3><div class="muted">${esc(sub)}</div>`;
-    let group = '';
-    list.forEach((item, i) => {
-      if (item.group !== group) { group = item.group; s += `<div class="group-title">${esc(group)}</div>`; }
-      const key = prefix + i;
-      const done = !!checked[key];
-      s += `<label class="item ${done ? 'done' : ''}">
-        <input type="checkbox" data-key="${key}" ${done ? 'checked' : ''}>
-        <span class="box">✓</span>
-        <span class="txt"><span class="nm">${esc(item.name)}</span><div class="qty">${esc(item.qty)}</div></span>
-      </label>`;
-    });
-    return s + '</div>';
-  };
-
-  const receipts = read(KEY.receipts, []);
-  const sum = receipts.reduce((a, r) => a + Number(r.total || 0), 0);
-  const pct = all.length ? Math.round((doneCount / all.length) * 100) : 0;
-
-  el.innerHTML = `
-    <div class="shop-summary">
-      <div class="row" style="justify-content:space-between">
-        <div><div class="muted">Отмечено</div><div class="big">${doneCount} из ${all.length}</div></div>
-        <button class="btn soft" id="reset-checks">Снять отметки</button>
-      </div>
-      <div class="progress"><div class="progress-bar" style="width:${pct}%"></div></div>
-    </div>
-    ${section('Закупка на месяц', 'Покупаем один раз, потом берём только скоропортящееся', D.bulk, 'b')}
-    ${section('Каждую неделю', 'Хлеб, зелень, фрукты и овощи для салатов', D.weekly, 'w')}
-
-    <div class="shop-card">
-      <h3>Чек закупки</h3>
-      <div class="muted">${checkedNames.length ? `Отмечено позиций: ${checkedNames.length}` : 'Отметьте купленное выше и введите сумму'}</div>
-      <label class="field" style="margin-top:10px">Магазин</label><input id="r-store" placeholder="Например, Пятёрочка">
-      <label class="field">Дата</label><input id="r-date" type="date" value="${new Date().toISOString().slice(0, 10)}">
-      <label class="field">Сумма, ₽</label><input id="r-total" inputmode="decimal" placeholder="0">
-      <button class="btn block" id="save-receipt">Сохранить чек</button>
-    </div>
-
-    <div class="shop-card">
-      <h3>История чеков</h3>
-      ${receipts.length ? receipts.map((r, i) => `
-        <div class="receipt-row">
-          <div><div style="font-weight:700">${esc(r.store || 'Магазин')}</div><div class="muted">${esc(r.date)} · позиций: ${r.items || 0}</div></div>
-          <div class="row"><span class="sum">${Number(r.total).toLocaleString('ru-RU')} ₽</span>
-          <button class="icon-btn" data-rdel="${i}" aria-label="Удалить чек">✕</button></div>
-        </div>`).join('') : '<div class="empty">Чеков пока нет</div>'}
-      ${receipts.length ? `<div class="total-line"><span>Всего потрачено</span><span>${sum.toLocaleString('ru-RU')} ₽</span></div>` : ''}
-    </div>`;
-
-  el.querySelectorAll('input[data-key]').forEach((cb) => {
-    cb.onchange = () => {
-      const c = read(KEY.checked, {});
-      if (cb.checked) c[cb.dataset.key] = true; else delete c[cb.dataset.key];
-      write(KEY.checked, c);
-      renderShopping();
-    };
-  });
-  $('#reset-checks').onclick = () => { write(KEY.checked, {}); renderShopping(); toast('Отметки сняты'); };
-  $('#save-receipt').onclick = () => {
-    const total = parseFloat(String($('#r-total').value).replace(',', '.'));
-    if (!total) return toast('Введите сумму чека');
-    const rs = read(KEY.receipts, []);
-    rs.unshift({
-      date: $('#r-date').value,
-      store: $('#r-store').value.trim(),
-      total,
-      items: checkedNames.length,
-      note: ''
-    });
-    write(KEY.receipts, rs);
-    write(KEY.checked, {});
-    renderShopping();
-    toast('Чек сохранён');
-  };
-  el.querySelectorAll('[data-rdel]').forEach((b) => {
-    b.onclick = () => {
-      const rs = read(KEY.receipts, []);
-      rs.splice(Number(b.dataset.rdel), 1);
-      write(KEY.receipts, rs);
-      renderShopping();
-    };
-  });
+function viewDocs() {
+  const docs = [...S.documents].sort((a, b) => ((a.expires || '9999') < (b.expires || '9999') ? -1 : 1));
+  return `<div class="row" style="justify-content:flex-end;margin-bottom:8px"><button class="btn" data-act="addDoc">+ Документ</button></div>
+    <div class="card">${docs.length ? docs.map((d) => {
+      const left = d.expires ? daysBetween(todayIso(), d.expires) : null;
+      return `<div class="li">
+        <div class="main"><div class="t">${esc(d.title)}</div>
+        <div class="s">${personName(d.personId) || 'Общий'}${d.expires ? ' · до ' + fmtDate(d.expires) : ''}</div></div>
+        ${left !== null ? `<span class="chip ${left < 30 ? 'dinner' : 'lunch'}">${left < 0 ? 'истёк' : left + ' дн.'}</span>` : ''}
+        <button class="icon-btn" data-act="del" data-coll="documents" data-id="${d.id}" aria-label="Удалить">✕</button></div>`;
+    }).join('') : '<div class="empty">Документов пока нет</div>'}</div>`;
 }
 
-// ---------- вкладка «Ещё» ----------
-function renderSettings() {
-  const el = $('#tab-settings');
-  el.innerHTML = `
-    <div class="card">
-      <div class="setting-title">Первый день плана</div>
-      <p class="setting-desc">От этой даты считается день 1 из 30.</p>
-      <input id="s-start" type="date" value="${esc(D.startDate)}">
-    </div>
-    <div class="card">
-      <div class="setting-title">База блюд и плана</div>
-      <p class="setting-desc">Изменения хранятся в этом браузере. Чтобы они попали в репозиторий, экспортируйте data.json и замените им файл в проекте.</p>
-      <div class="row">
-        <button class="btn" id="s-export">Экспорт data.json</button>
-        <label class="btn soft" style="cursor:pointer">Импорт<input id="s-import" type="file" accept="application/json" class="hidden"></label>
-      </div>
-    </div>
-    <div class="card">
-      <div class="setting-title">Сброс</div>
-      <p class="setting-desc">Удаляет локальные правки блюд, плана, замены и отметки покупок. Чеки сохраняются.</p>
-      <button class="btn danger" id="s-reset">Сбросить правки</button>
-    </div>`;
+function viewPeople() {
+  return `
+    <div class="card"><div class="setting-title">Кто вы</div>
+      <p class="setting-desc">Определяет, чьи личные операции вы видите. Это не защита данных: все данные доступны в браузере.</p>
+      <select id="me-select">${S.people.map((p) => `<option value="${p.id}" ${p.id === ME ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select></div>
+    <div class="card"><div class="row" style="justify-content:space-between"><div class="setting-title">Участники</div>
+      <button class="btn soft" data-act="addPerson">+ Человек</button></div>
+      ${S.people.map((p) => `<div class="li"><div class="main"><div class="t">${esc(p.name)}</div></div>
+        <button class="icon-btn" data-act="renamePerson" data-id="${p.id}" aria-label="Переименовать">✎</button>
+        <button class="icon-btn" data-act="del" data-coll="people" data-id="${p.id}" aria-label="Удалить">✕</button></div>`).join('')}</div>
+    <div class="card"><div class="row" style="justify-content:space-between"><div class="setting-title">Счета</div>
+      <button class="btn soft" data-act="addAcc">+ Счёт</button></div>
+      ${S.accounts.map((a) => `<div class="li"><div class="main"><div class="t">${esc(a.name)}</div>
+        <div class="s">${a.owner === 'shared' ? 'общий' : esc(personName(a.owner))}</div></div>
+        <button class="icon-btn" data-act="del" data-coll="accounts" data-id="${a.id}" aria-label="Удалить">✕</button></div>`).join('')}</div>
+    <div class="card"><div class="setting-title">Категории</div><p class="setting-desc">Через запятую</p>
+      <label class="field">Расходы</label><textarea id="cat-exp" rows="2">${esc(S.categories.expense.join(', '))}</textarea>
+      <label class="field">Доходы</label><textarea id="cat-inc" rows="2">${esc(S.categories.income.join(', '))}</textarea>
+      <button class="btn soft" data-act="saveCats">Сохранить категории</button></div>
+    <div class="card"><div class="setting-title">Уведомления</div>
+      <p class="setting-desc">За сколько дней предупреждать о событии.</p>
+      <label class="field">Дней заранее</label><input id="notify-days" type="number" min="0" max="30" value="${S.settings.notifyDaysAhead}">
+      <div class="pill-row"><button class="btn soft" data-act="saveSettings">Сохранить</button>
+      <button class="btn soft" data-act="notify">Включить уведомления</button></div></div>
+    <div class="card"><div class="setting-title">Данные</div>
+      <p class="setting-desc">Экспорт сохраняет всё в файл. Не кладите этот файл в публичный репозиторий: в нём финансы.</p>
+      <div class="pill-row"><button class="btn" data-act="exportData">Экспорт</button>
+      <label class="btn soft" style="cursor:pointer">Импорт<input id="import-file" type="file" accept="application/json" class="hidden"></label>
+      <button class="btn danger" data-act="resetData">Сбросить всё</button></div></div>`;
+}
 
-  $('#s-start').onchange = (e) => {
-    D.startDate = e.target.value;
-    write(KEY.start, D.startDate);
-    viewDay = Math.min(Math.max(todayDay(), 1), D.plan.length);
-    renderAll();
-    toast('Дата сохранена');
-  };
-  $('#s-export').onclick = () => {
-    const data = { startDate: D.startDate, dishes: D.dishes, plan: D.plan, bulk: D.bulk, weekly: D.weekly };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'data.json';
-    a.click();
-    URL.revokeObjectURL(a.href);
-  };
-  $('#s-import').onchange = async (e) => {
+const VIEWS = { dash: viewDash, fin: viewFin, goals: viewGoals, wish: viewWish, rem: viewRem, car: viewCar, house: viewHouse, docs: viewDocs, people: viewPeople };
+
+// ---------- отрисовка ----------
+function render() {
+  if (!S) return;
+  $('#hero-title').textContent = SECTIONS.find((s) => s[0] === SEC)[1];
+  $('#hero-sub').textContent = `${fmtDate(todayIso())} · ${personName(ME) || 'Гость'}`;
+  $('#sections').innerHTML = SECTIONS.map(([id, l]) =>
+    `<button class="${id === SEC ? 'active' : ''}" data-act="sec" data-v="${id}">${l}</button>`).join('');
+  $('#main').innerHTML = VIEWS[SEC]();
+  bindChange();
+}
+
+function bindChange() {
+  const me = $('#me-select');
+  if (me) me.onchange = () => { ME = me.value; write('as.me', ME); render(); };
+  const imp = $('#import-file');
+  if (imp) imp.onchange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
     try {
       const j = JSON.parse(await file.text());
-      if (!Array.isArray(j.dishes) || !Array.isArray(j.plan)) throw new Error('нет dishes или plan');
-      D.dishes = j.dishes; D.plan = j.plan;
-      if (j.startDate) { D.startDate = j.startDate; write(KEY.start, j.startDate); }
-      if (Array.isArray(j.bulk)) D.bulk = j.bulk;
-      if (Array.isArray(j.weekly)) D.weekly = j.weekly;
-      write(KEY.dishes, D.dishes);
-      write(KEY.plan, D.plan);
+      if (!Array.isArray(j.people) || !Array.isArray(j.transactions)) throw new Error('это не файл «Ассистента»');
+      S = { ...S, ...j };
+      ME = S.people.some((p) => p.id === ME) ? ME : S.people[0].id;
+      save();
       toast('Данные импортированы');
-      renderAll();
+      render();
     } catch (err) {
-      alert('Не удалось импортировать файл: ' + err.message);
+      alert('Не удалось импортировать: ' + err.message);
     }
   };
-  $('#s-reset').onclick = async () => {
-    if (!confirm('Сбросить локальные правки?')) return;
-    [KEY.dishes, KEY.plan, KEY.overrides, KEY.checked, KEY.start].forEach((k) => localStorage.removeItem(k));
-    await loadBase();
-    renderAll();
-    toast('Правки сброшены');
-  };
 }
 
-// ---------- загрузка и запуск ----------
+// ---------- действия (клики) ----------
+const ADD = {
+  addOp: () => openForm('Новая операция', [
+    { k: 'type', t: 'select', l: 'Тип', opts: [['expense', 'Расход'], ['income', 'Доход']], v: 'expense' },
+    { k: 'amount', t: 'number', l: 'Сумма', ph: '0' },
+    { k: 'date', t: 'date', l: 'Дата', v: todayIso() },
+    { k: 'category', t: 'select', l: 'Категория', opts: catAll() },
+    { k: 'account', t: 'select', l: 'Счёт', opts: accOpts() },
+    { k: 'personId', t: 'select', l: 'Чей', opts: personOpts(), v: ME },
+    { k: 'private', t: 'check', l: 'Личное (видите только вы)', v: false },
+    { k: 'note', t: 'text', l: 'Комментарий' }
+  ], (o) => {
+    if (!o.amount || o.amount <= 0) return 'Введите сумму';
+    if (!o.date) return 'Укажите дату';
+    S.transactions.push({ id: uid(), type: o.type, amount: o.amount, date: o.date, category: o.category || 'Прочее',
+      account: o.account, personId: o.personId, private: o.private, note: o.note });
+    return null;
+  }),
+  addRec: () => openForm('Регулярный платёж', [
+    { k: 'title', t: 'text', l: 'Название', ph: 'Аренда, интернет, подписка' },
+    { k: 'amount', t: 'number', l: 'Сумма в месяц' },
+    { k: 'day', t: 'number', l: 'День месяца (1–31)', v: 5 },
+    { k: 'category', t: 'select', l: 'Категория', opts: catAll() },
+    { k: 'account', t: 'select', l: 'Счёт', opts: accOpts() },
+    { k: 'personId', t: 'select', l: 'Чей', opts: personOpts(), v: '' }
+  ], (o) => {
+    if (!o.title || !need(o, ['amount', 'day'])) return 'Заполните название, сумму и день';
+    S.recurring.push({ id: uid(), title: o.title, amount: o.amount, day: Math.min(31, Math.max(1, o.day)),
+      category: o.category, account: o.account, personId: o.personId, active: true });
+    return null;
+  }),
+  addDebt: () => openForm('Долг или кредит', [
+    { k: 'title', t: 'text', l: 'Название' },
+    { k: 'total', t: 'number', l: 'Сумма долга' },
+    { k: 'remaining', t: 'number', l: 'Остаток сейчас (если пусто, равен сумме)' },
+    { k: 'monthly', t: 'number', l: 'Ежемесячный платёж' },
+    { k: 'dueDay', t: 'number', l: 'День платежа (1–31)', v: 10 }
+  ], (o) => {
+    if (!o.title || !need(o, ['total', 'monthly'])) return 'Заполните название, сумму и платёж';
+    const rem = o.remaining === '' ? o.total : o.remaining;
+    S.debts.push({ id: uid(), title: o.title, total: o.total, remaining: rem, monthly: o.monthly, dueDay: o.dueDay || 10 });
+    return null;
+  }),
+  addGoal: () => openForm('Новая цель', [
+    { k: 'kind', t: 'select', l: 'Тип', opts: [['long', 'Долгосрочная'], ['short', 'Краткосрочная']], v: GOAL_KIND },
+    { k: 'title', t: 'text', l: 'Название' },
+    { k: 'target', t: 'number', l: 'Нужная сумма' },
+    { k: 'saved', t: 'number', l: 'Уже отложено', v: 0 },
+    { k: 'deadline', t: 'date', l: 'Срок (необязательно)' },
+    { k: 'personId', t: 'select', l: 'Чья', opts: personOpts(), v: '' }
+  ], (o) => {
+    if (!o.title || !need(o, ['target'])) return 'Введите название и сумму';
+    S.goals.push({ id: uid(), kind: o.kind, title: o.title, target: o.target, saved: o.saved || 0, deadline: o.deadline, personId: o.personId });
+    return null;
+  }),
+  addWish: () => openForm('Новое желание', [
+    { k: 'title', t: 'text', l: 'Что хочется' },
+    { k: 'price', t: 'number', l: 'Примерная цена' },
+    { k: 'url', t: 'text', l: 'Ссылка (необязательно)', ph: 'https://' },
+    { k: 'priority', t: 'select', l: 'Приоритет', opts: [['1', 'Высокий'], ['2', 'Средний'], ['3', 'Низкий']], v: '2' },
+    { k: 'personId', t: 'select', l: 'Для кого', opts: personOpts(), v: '' }
+  ], (o) => {
+    if (!o.title) return 'Введите название';
+    S.wishes.push({ id: uid(), title: o.title, price: o.price || '', url: o.url, priority: Number(o.priority), personId: o.personId, bought: false });
+    return null;
+  }),
+  addRem: () => openForm('Напоминание', [
+    { k: 'title', t: 'text', l: 'Что напомнить' },
+    { k: 'date', t: 'date', l: 'Дата', v: todayIso() },
+    { k: 'repeat', t: 'select', l: 'Повтор', opts: Object.entries(REPEAT), v: 'none' },
+    { k: 'personId', t: 'select', l: 'Для кого', opts: personOpts(), v: '' }
+  ], (o) => {
+    if (!o.title || !o.date) return 'Введите название и дату';
+    S.reminders.push({ id: uid(), title: o.title, date: o.date, repeat: o.repeat, personId: o.personId });
+    return null;
+  }),
+  addCar: () => openForm('Автомобиль', [
+    { k: 'make', t: 'text', l: 'Марка' },
+    { k: 'model', t: 'text', l: 'Модель' },
+    { k: 'year', t: 'number', l: 'Год' },
+    { k: 'plate', t: 'text', l: 'Госномер' },
+    { k: 'mileage', t: 'number', l: 'Текущий пробег, км' },
+    { k: 'insuranceUntil', t: 'date', l: 'Страховка до' },
+    { k: 'inspectionUntil', t: 'date', l: 'Техосмотр до' }
+  ], (o) => {
+    if (!o.make || !o.model) return 'Укажите марку и модель';
+    S.cars.push({ id: uid(), make: o.make, model: o.model, year: o.year || '', plate: o.plate, mileage: o.mileage || '',
+      insuranceUntil: o.insuranceUntil, inspectionUntil: o.inspectionUntil });
+    return null;
+  }),
+  addTask: () => openForm('Дело по дому', [
+    { k: 'title', t: 'text', l: 'Что сделать', ph: 'Поменять фильтр, мыть холодильник' },
+    { k: 'everyDays', t: 'number', l: 'Повторять каждые N дней', v: 30 },
+    { k: 'assignee', t: 'select', l: 'Кто', opts: personOpts(), v: '' }
+  ], (o) => {
+    if (!o.title || !need(o, ['everyDays']) || o.everyDays <= 0) return 'Укажите дело и период';
+    S.homeTasks.push({ id: uid(), title: o.title, everyDays: o.everyDays, lastDone: '', assignee: o.assignee });
+    return null;
+  }),
+  addMeter: () => openForm('Счётчик', [
+    { k: 'name', t: 'text', l: 'Название' },
+    { k: 'unit', t: 'text', l: 'Единица', ph: 'м³, кВт·ч' }
+  ], (o) => {
+    if (!o.name) return 'Введите название';
+    S.meters.push({ id: uid(), name: o.name, unit: o.unit || '' });
+    return null;
+  }),
+  addDoc: () => openForm('Документ', [
+    { k: 'title', t: 'text', l: 'Название', ph: 'Паспорт, полис, гарантия' },
+    { k: 'personId', t: 'select', l: 'Чей', opts: personOpts(), v: '' },
+    { k: 'expires', t: 'date', l: 'Действует до (необязательно)' }
+  ], (o) => {
+    if (!o.title) return 'Введите название';
+    S.documents.push({ id: uid(), title: o.title, personId: o.personId, expires: o.expires });
+    return null;
+  }),
+  addPerson: () => openForm('Новый человек', [{ k: 'name', t: 'text', l: 'Имя' }], (o) => {
+    if (!o.name) return 'Введите имя';
+    S.people.push({ id: uid(), name: o.name });
+    return null;
+  }),
+  addAcc: () => openForm('Счёт', [
+    { k: 'name', t: 'text', l: 'Название', ph: 'Карта Сбера, наличные' },
+    { k: 'owner', t: 'select', l: 'Кому принадлежит', opts: [['shared', 'Общий'], ...S.people.map((p) => [p.id, p.name])], v: 'shared' }
+  ], (o) => {
+    if (!o.name) return 'Введите название';
+    S.accounts.push({ id: uid(), name: o.name, owner: o.owner });
+    return null;
+  })
+};
+
+const ACTIONS = {
+  sec: (d) => { SEC = d.v; },
+  finMonth: (d) => { FIN_MONTH = shiftMonth(FIN_MONTH, Number(d.d)); },
+  finTab: (d) => { FIN_TAB = d.v; },
+  goalKind: (d) => { GOAL_KIND = d.v; },
+  houseTab: (d) => { HOUSE_TAB = d.v; },
+  carOpen: (d) => { CAR_ID = CAR_ID === d.id ? null : d.id; },
+  del: (d) => {
+    if (!confirm('Удалить запись?')) return false;
+    S[d.coll] = S[d.coll].filter((x) => x.id !== d.id);
+  },
+  toggleRec: (d) => { const r = S.recurring.find((x) => x.id === d.id); r.active = !r.active; },
+  wishBought: (d) => { const w = S.wishes.find((x) => x.id === d.id); w.bought = !w.bought; },
+  taskDone: (d) => { const t = S.homeTasks.find((x) => x.id === d.id); t.lastDone = todayIso(); },
+  topUp: (d) => {
+    const g = S.goals.find((x) => x.id === d.id);
+    openForm('Пополнить: ' + g.title, [{ k: 'amt', t: 'number', l: 'Сумма' }], (o) => {
+      if (!o.amt || o.amt <= 0) return 'Введите сумму';
+      g.saved = (g.saved || 0) + o.amt;
+      return null;
+    });
+    return false;
+  },
+  payDebt: (d) => {
+    const debt = S.debts.find((x) => x.id === d.id);
+    openForm('Платёж: ' + debt.title, [{ k: 'amt', t: 'number', l: 'Сумма платежа', v: debt.monthly }], (o) => {
+      if (!o.amt || o.amt <= 0) return 'Введите сумму';
+      debt.remaining = Math.max(0, debt.remaining - o.amt);
+      return null;
+    });
+    return false;
+  },
+  addCarExp: (d) => {
+    const car = S.cars.find((x) => x.id === d.id);
+    openForm(`Расход: ${car.make} ${car.model}`, [
+      { k: 'type', t: 'select', l: 'Вид', opts: Object.entries(CAR_TYPES), v: 'fuel' },
+      { k: 'date', t: 'date', l: 'Дата', v: todayIso() },
+      { k: 'amount', t: 'number', l: 'Сумма' },
+      { k: 'mileage', t: 'number', l: 'Пробег, км (для расхода топлива)' },
+      { k: 'liters', t: 'number', l: 'Литры (для топлива)' },
+      { k: 'note', t: 'text', l: 'Комментарий' }
+    ], (o) => {
+      if (!need(o, ['amount'])) return 'Введите сумму';
+      S.carExpenses.push({ id: uid(), carId: car.id, type: o.type, date: o.date, amount: o.amount,
+        mileage: o.mileage, liters: o.liters, note: o.note });
+      if (o.mileage && (!car.mileage || o.mileage > car.mileage)) car.mileage = o.mileage;
+      return null;
+    });
+    return false;
+  },
+  addReading: (d) => {
+    const m = S.meters.find((x) => x.id === d.id);
+    openForm(`Показание: ${m.name}`, [
+      { k: 'value', t: 'number', l: `Показание, ${m.unit}` },
+      { k: 'date', t: 'date', l: 'Дата', v: todayIso() }
+    ], (o) => {
+      if (!need(o, ['value'])) return 'Введите показание';
+      S.meterReadings.push({ id: uid(), meterId: m.id, value: o.value, date: o.date });
+      return null;
+    });
+    return false;
+  },
+  renamePerson: (d) => {
+    const p = S.people.find((x) => x.id === d.id);
+    const name = prompt('Имя', p.name);
+    if (name && name.trim()) p.name = name.trim();
+  },
+  saveCats: () => {
+    const split = (id) => $(id).value.split(',').map((s) => s.trim()).filter(Boolean);
+    S.categories.expense = split('#cat-exp');
+    S.categories.income = split('#cat-inc');
+  },
+  saveSettings: () => {
+    const n = parseInt($('#notify-days').value, 10);
+    S.settings.notifyDaysAhead = isNaN(n) ? 3 : Math.min(30, Math.max(0, n));
+    toast('Сохранено');
+  },
+  notify: () => { enableNotify(); return false; },
+  exportData: () => {
+    const blob = new Blob([JSON.stringify(S, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'assistant-data.json';
+    a.click();
+    URL.revokeObjectURL(a.href);
+    return false;
+  },
+  resetData: async () => {
+    if (!confirm('Удалить все данные в этом браузере и вернуть пустой шаблон?')) return false;
+    localStorage.removeItem('as.data');
+    S = await loadBase();
+    ME = S.people[0].id;
+    save();
+    toast('Данные сброшены');
+  }
+};
+
+document.addEventListener('click', (e) => {
+  const el = e.target.closest('[data-act]');
+  if (!el) return;
+  const name = el.dataset.act;
+  let changed;
+  if (ADD[name]) { ADD[name](); return; }
+  if (!ACTIONS[name]) return;
+  changed = ACTIONS[name](el.dataset);
+  if (changed !== false) { save(); render(); }
+});
+
+// ---------- уведомления ----------
+async function enableNotify() {
+  if (!('Notification' in window)) return toast('Браузер не поддерживает уведомления');
+  const p = await Notification.requestPermission();
+  toast(p === 'granted' ? 'Уведомления включены' : 'Уведомления не разрешены');
+  checkNotify();
+}
+
+function checkNotify() {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  const t = todayIso();
+  if (read('as.lastNotify', '') === t) return;
+  const items = upcoming(S, t, S.settings.notifyDaysAhead);
+  if (!items.length) return;
+  write('as.lastNotify', t);
+  for (const it of items.slice(0, 5)) {
+    new Notification('Ассистент', { body: `${fmtDate(it.date)} · ${it.title}` });
+  }
+}
+
+// ---------- запуск ----------
 async function loadBase() {
-  const base = await (await fetch('data.json', { cache: 'no-store' })).json();
-  D = {
-    startDate: read(KEY.start, base.startDate),
-    dishes: read(KEY.dishes, base.dishes),
-    plan: read(KEY.plan, base.plan),
-    bulk: base.bulk,
-    weekly: base.weekly
-  };
-  viewDay = Math.min(Math.max(todayDay(), 1), D.plan.length);
-}
-
-function renderAll() {
-  renderHero();
-  renderToday();
-  renderDishes();
-  renderShopping();
-  renderSettings();
-}
-
-function showTab(name) {
-  document.querySelectorAll('.tabs button').forEach((b) => b.classList.toggle('active', b.dataset.tab === name));
-  document.querySelectorAll('.tab').forEach((s) => s.classList.toggle('active', s.id === 'tab-' + name));
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  return (await fetch('data.json', { cache: 'no-store' })).json();
 }
 
 async function init() {
-  document.querySelectorAll('.tabs button').forEach((b) => {
-    b.onclick = () => showTab(b.dataset.tab);
-  });
-  $('#modal-close').onclick = hideModal;
-  $('#modal').onclick = (e) => { if (e.target.id === 'modal') hideModal(); };
+  $('#modal-close').onclick = closeModal;
+  $('#modal').onclick = (e) => { if (e.target.id === 'modal') closeModal(); };
   try {
-    await loadBase();
-    renderAll();
+    const base = await loadBase();
+    S = { ...base, ...read('as.data', {}) };
+    S.settings = { ...base.settings, ...(S.settings || {}) };
+    ME = read('as.me', null);
+    if (!S.people.some((p) => p.id === ME)) ME = S.people[0] ? S.people[0].id : null;
+    render();
+    checkNotify();
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) checkNotify(); });
   } catch (err) {
-    document.querySelector('main').innerHTML = `<div class="card">Не удалось загрузить data.json. Откройте приложение по ссылке GitHub Pages или через локальный сервер, а не файлом.<br><span class="muted">${esc(err.message)}</span></div>`;
+    $('#main').innerHTML = `<div class="card">Не удалось загрузить data.json. Откройте приложение по ссылке GitHub Pages или через локальный сервер.<br><span class="muted">${esc(err.message)}</span></div>`;
   }
 }
 
